@@ -34,12 +34,13 @@ show_help() {
     echo -e "${YELLOW}Usage:${NC} ./deploy.sh <action>"
     echo ""
     echo -e "${YELLOW}Actions:${NC}"
+    echo "  setup            Install system dependencies (Python 3.12+, Node.js 18+)"
+    echo "  install          Install project dependencies (venv + npm)"
+    echo "  build            Build frontend for production"
     echo "  start            Start both backend and frontend"
     echo "  stop             Stop both backend and frontend"
     echo "  restart          Restart both backend and frontend"
     echo "  status           Show service running status"
-    echo "  install          Install dependencies (venv + npm)"
-    echo "  build            Build frontend for production"
     echo "  prod             Start production mode (PRODUCTION=1)"
     echo "  backup           Backup database"
     echo "  restore          Restore database from latest backup"
@@ -54,7 +55,8 @@ show_help() {
     echo "  svc-log [name]   View service logs (backend/frontend)"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
-    echo "  ./deploy.sh install        # First-time setup"
+    echo "  ./deploy.sh setup          # First-time: install Python & Node.js"
+    echo "  ./deploy.sh install        # Install venv & npm deps"
     echo "  ./deploy.sh start          # Dev mode (nohup)"
     echo "  ./deploy.sh svc-install    # Install as system services"
     echo "  ./deploy.sh svc-start      # Start via systemd"
@@ -67,6 +69,156 @@ log_warn()  { echo -e "${YELLOW}$1${NC}"; }
 log_error() { echo -e "${RED}$1${NC}"; }
 
 mkdir -p "$PID_DIR"
+
+# ─── Detect Package Manager ─────────────────────────────
+detect_pkg_manager() {
+    if command -v apt-get &>/dev/null; then
+        echo "apt"
+    elif command -v dnf &>/dev/null; then
+        echo "dnf"
+    elif command -v yum &>/dev/null; then
+        echo "yum"
+    elif command -v apk &>/dev/null; then
+        echo "apk"
+    elif command -v zypper &>/dev/null; then
+        echo "zypper"
+    elif command -v pacman &>/dev/null; then
+        echo "pacman"
+    else
+        echo ""
+    fi
+}
+
+pkg_install() {
+    local mgr=$1; shift
+    case "$mgr" in
+        apt)   apt-get update && apt-get install -y "$@" ;;
+        dnf)   dnf install -y "$@" ;;
+        yum)   yum install -y "$@" ;;
+        apk)   apk add --no-cache "$@" ;;
+        zypper) zypper install -y "$@" ;;
+        pacman) pacman -S --noconfirm --needed "$@" ;;
+    esac
+}
+
+# ─── Setup (install Python + Node.js) ────────────────────
+do_setup() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Must run as root (sudo ./deploy.sh setup)"
+        exit 1
+    fi
+
+    local mgr
+    mgr="$(detect_pkg_manager)"
+    if [ -z "$mgr" ]; then
+        log_error "Unsupported package manager. Please install manually:"
+        log_error "  Python 3.12+"
+        log_error "  Node.js 18+"
+        exit 1
+    fi
+    log_info "Detected package manager: $mgr"
+
+    # ── Python ────────────────────────────────────────────
+    if command -v python3 &>/dev/null; then
+        local py_ver
+        py_ver=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        local major minor
+        major=$(echo "$py_ver" | cut -d. -f1)
+        minor=$(echo "$py_ver" | cut -d. -f2)
+        if [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -ge 12 ]; }; then
+            log_ok "Python $py_ver already installed"
+        else
+            log_warn "Python $py_ver found, need 3.12+. Installing..."
+            if [ "$mgr" = "apt" ]; then
+                pkg_install "$mgr" software-properties-common
+                add-apt-repository -y ppa:deadsnakes/ppa
+                pkg_install "$mgr" python3.12 python3.12-venv python3.12-dev python3-pip curl
+            elif [ "$mgr" = "dnf" ] || [ "$mgr" = "yum" ]; then
+                pkg_install "$mgr" python3.12 python3.12-pip curl
+            else
+                pkg_install "$mgr" python3 python3-pip curl
+            fi
+            # Verify
+            python3 --version 2>/dev/null || python3.12 --version 2>/dev/null
+        fi
+    else
+        log_info "Python not found, installing..."
+        if [ "$mgr" = "apt" ]; then
+            pkg_install "$mgr" software-properties-common
+            add-apt-repository -y ppa:deadsnakes/ppa
+            pkg_install "$mgr" python3.12 python3.12-venv python3.12-dev python3-pip curl
+        elif [ "$mgr" = "dnf" ] || [ "$mgr" = "yum" ]; then
+            pkg_install "$mgr" python3.12 python3.12-pip curl
+        else
+            pkg_install "$mgr" python3 python3-pip curl
+        fi
+    fi
+
+    # Ensure python3 links to 3.12+ if 3.12 was installed via deadsnakes
+    if command -v python3.12 &>/dev/null && ! python3 -c "import sys; exit(0 if sys.version_info >= (3,12) else 1)" 2>/dev/null; then
+        log_warn "Setting python3 -> python3.12 (system python3 is older)"
+        update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100 2>/dev/null || true
+    fi
+
+    # ── Node.js ───────────────────────────────────────────
+    local need_node=true
+    if command -v node &>/dev/null; then
+        local node_ver
+        node_ver=$(node -v | sed 's/v//')
+        local major_v
+        major_v=$(echo "$node_ver" | cut -d. -f1)
+        if [ "$major_v" -ge 18 ]; then
+            log_ok "Node.js $node_ver already installed"
+            need_node=false
+        else
+            log_warn "Node.js $node_ver found, need 18+. Installing..."
+        fi
+    fi
+
+    if $need_node; then
+        log_info "Installing Node.js 18+ via NodeSource..."
+        if command -v curl &>/dev/null; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null || {
+                # Fallback: try system package
+                log_warn "NodeSource setup failed, falling back to system package..."
+                if [ "$mgr" = "apt" ]; then
+                    pkg_install "$mgr" nodejs npm
+                elif [ "$mgr" = "dnf" ]; then
+                    pkg_install "$mgr" nodejs npm
+                else
+                    pkg_install "$mgr" nodejs npm
+                fi
+            }
+            # If NodeSource succeeded, install from its repo
+            if command -v node &>/dev/null; then
+                local nver
+                nver=$(node -v | sed 's/v//')
+                if [ "$(echo "$nver" | cut -d. -f1)" -ge 18 ]; then
+                    log_ok "Node.js $nver installed"
+                else
+                    pkg_install "$mgr" nodejs
+                fi
+            else
+                pkg_install "$mgr" nodejs
+            fi
+        else
+            pkg_install "$mgr" curl
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            pkg_install "$mgr" nodejs
+        fi
+    fi
+
+    # ── Install essential build tools ─────────────────────
+    if [ "$mgr" = "apt" ]; then
+        pkg_install "$mgr" build-essential || true
+    fi
+
+    log_ok ""
+    log_ok "=== System dependencies installed ==="
+    python3 --version 2>/dev/null || python3.12 --version
+    node -v 2>/dev/null || log_warn "Node.js not found after install"
+    npm -v 2>/dev/null || log_warn "npm not found after install"
+}
 
 # ─── Virtual Environment ─────────────────────────────────
 ensure_venv() {
@@ -443,6 +595,7 @@ svc_log() {
 ACTION="${1:-help}"
 
 case "$ACTION" in
+    setup)            do_setup ;;
     start)            do_start ;;
     stop)             do_stop ;;
     restart)          do_restart ;;

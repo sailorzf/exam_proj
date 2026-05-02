@@ -76,16 +76,35 @@ exam-proj/
 
 ### 方式一：开发环境部署
 
-#### 1. 安装依赖（创建虚拟环境）
+#### 1. 安装系统依赖（Python 3.12+、Node.js 18+）
 
 ```bash
-chmod +x deploy.sh
+sudo ./deploy.sh setup
+```
+
+脚本会自动检测包管理器（apt/dnf/yum/apk/pacman），并安装：
+- **Python 3.12+**（Ubuntu/Debian 使用 deadsnakes PPA，其他使用系统源）
+- **Node.js 20.x**（通过 NodeSource 仓库，失败则回退系统包）
+- 构建工具（build-essential）
+
+也可手动安装：
+
+```bash
+# Ubuntu/Debian
+sudo apt install -y python3.12 python3.12-venv nodejs npm curl
+# CentOS/Fedora
+sudo dnf install -y python3.12 nodejs npm curl
+```
+
+#### 2. 安装项目依赖（虚拟环境 + npm）
+
+```bash
 ./deploy.sh install
 ```
 
-脚本会自动在 `venv/` 创建 Python 虚拟环境并安装后端依赖，同时安装前端 npm 依赖。
+脚本会自动创建 `venv/` 虚拟环境并安装 Python 依赖，同时安装前端 npm 依赖。
 
-#### 2. 启动服务
+#### 3. 启动服务
 
 ```bash
 # 方式 A：使用部署脚本
@@ -102,7 +121,7 @@ cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 cd frontend && npx vite
 ```
 
-#### 3. 访问
+#### 4. 访问
 
 - 前端开发：http://localhost:5173
 - 后端 API：http://localhost:8000
@@ -113,19 +132,25 @@ cd frontend && npx vite
 
 适用于 Linux 服务器，将前后端作为系统服务管理，支持开机自启、崩溃自动重启。
 
-#### 1. 安装依赖
+#### 1. 安装系统依赖
+
+```bash
+sudo ./deploy.sh setup
+```
+
+#### 2. 安装项目依赖
 
 ```bash
 ./deploy.sh install
 ```
 
-#### 2. 构建前端（可选，生产模式使用 PRODUCTION=1 时不需要 Vite）
+#### 3. 构建前端（可选，生产模式使用 PRODUCTION=1 时不需要 Vite）
 
 ```bash
 ./deploy.sh build
 ```
 
-#### 3. 安装为系统服务
+#### 4. 安装为系统服务
 
 ```bash
 sudo ./deploy.sh svc-install
@@ -137,7 +162,7 @@ sudo ./deploy.sh svc-install
 - 设置 `Restart=always`，崩溃后 5 秒自动重启
 - 设置开机自启 (`systemctl enable`)
 
-#### 4. 管理服务
+#### 5. 管理服务
 
 ```bash
 sudo ./deploy.sh svc-start        # 启动
@@ -149,7 +174,7 @@ sudo ./deploy.sh svc-log frontend # 查看前端日志
 sudo ./deploy.sh svc-uninstall    # 卸载服务
 ```
 
-#### 5. 可选：Nginx 反向代理
+#### 6. 可选：Nginx 反向代理
 
 ```nginx
 server {
