@@ -3,7 +3,8 @@
     <div class="header">
       <Timer :duration-minutes="duration" @expired="handleSubmit" />
       <span>题目 {{ ci+1 }}/{{ questions.length }}</span>
-      <button @click="next" :disabled="ci>=questions.length-1">下一题</button>
+      <button v-if="ci>=questions.length-1" @click="handleSubmit" class="submit-header">提交</button>
+      <button v-else @click="next">下一题</button>
     </div>
     <div class="body">
       <QuestionRenderer :question="questions[ci]" v-model="answers[ci]" :label="ci+1" />
@@ -71,6 +72,8 @@ async function handleSubmit(){
 .header button { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:0.5rem; min-height:44px; padding:0.5rem 1rem; }
 .header button:hover { background:rgba(255,255,255,0.25); }
 .header button:disabled { opacity:0.4; cursor:not-allowed; }
+.header .submit-header { background:#ba1a1a; color:#fff; border-color:#ba1a1a; }
+.header .submit-header:hover { background:#dc2626; }
 .body { padding:2rem; flex:1; }
 .footer { display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1.5rem; background:#f0ecf9; border-top:1px solid #e4e1ee; gap:1rem; flex-wrap:wrap; }
 .footer button { padding:0.5rem 1rem; border:1px solid #c7c4d8; border-radius:0.5rem; background:#fff; cursor:pointer; min-height:44px; color:#464555; transition:all 0.15s; }
