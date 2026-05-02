@@ -65,83 +65,91 @@ exam-proj/
 │       ├── components/
 │       └── views/
 ├── data/                    # 运行时生成 (数据库文件)
+├── venv/                    # Python 虚拟环境 (自动生成)
+├── logs/                    # 运行日志 (自动生成)
 ├── manage.ps1               # Windows 管理脚本
-├── deploy.sh                # Linux 部署脚本
-└── DESIGN.md                # 设计系统文档
+├── deploy.sh                # Linux 部署脚本 (支持 systemd)
+└── DEPLOY.md                # 本文件
 ```
 
 ## 部署方式
 
 ### 方式一：开发环境部署
 
-#### 1. 安装 Python 依赖
+#### 1. 安装依赖（创建虚拟环境）
 
 ```bash
-cd backend
-pip install -r requirements.txt
-```
-
-#### 2. 安装前端依赖
-
-```bash
-cd ../frontend
-npm install
-```
-
-#### 3. 启动服务
-
-```bash
-# 方式 A：分别启动
-cd ../backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-# 另开终端
-cd ../frontend && npx vite
-
-# 方式 B：使用管理脚本 (Windows)
-.\manage.ps1 start
-
-# 方式 C：使用部署脚本 (Linux)
 chmod +x deploy.sh
-./deploy.sh start
+./deploy.sh install
 ```
 
-#### 4. 访问
+脚本会自动在 `venv/` 创建 Python 虚拟环境并安装后端依赖，同时安装前端 npm 依赖。
+
+#### 2. 启动服务
+
+```bash
+# 方式 A：使用部署脚本
+./deploy.sh start
+
+# 方式 B：分别启动
+./deploy.sh backend-start
+./deploy.sh frontend-start
+
+# 方式 C：手动启动（需激活虚拟环境）
+source venv/bin/activate
+cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 另开终端
+cd frontend && npx vite
+```
+
+#### 3. 访问
 
 - 前端开发：http://localhost:5173
 - 后端 API：http://localhost:8000
 - Swagger 文档：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/api/health
 
-### 方式二：生产环境部署 (推荐)
+### 方式二：systemd 服务部署 (生产推荐)
 
-#### 1. 构建前端
+适用于 Linux 服务器，将前后端作为系统服务管理，支持开机自启、崩溃自动重启。
 
-```bash
-cd frontend
-npm install
-npm run build
-# 输出到 frontend/dist/
-```
-
-#### 2. 安装后端依赖
+#### 1. 安装依赖
 
 ```bash
-cd ../backend
-pip install -r requirements.txt
+./deploy.sh install
 ```
 
-#### 3. 启动后端 (带静态文件)
+#### 2. 构建前端（可选，生产模式使用 PRODUCTION=1 时不需要 Vite）
 
 ```bash
-export PRODUCTION=1
-export JWT_SECRET_KEY="your-random-secret-key-change-in-production"
-cd ../backend
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+./deploy.sh build
 ```
 
-`PRODUCTION=1` 环境变量启用后，FastAPI 会自动挂载 `frontend/dist/` 的静态文件，
-无需额外 Nginx 配置。
+#### 3. 安装为系统服务
 
-#### 4. 可选：Nginx 反向代理
+```bash
+sudo ./deploy.sh svc-install
+```
+
+此命令会：
+- 创建 `/etc/systemd/system/exam-backend.service` 和 `exam-frontend.service`
+- 后端使用 `venv/bin/python` 运行，不受系统 Python 版本影响
+- 设置 `Restart=always`，崩溃后 5 秒自动重启
+- 设置开机自启 (`systemctl enable`)
+
+#### 4. 管理服务
+
+```bash
+sudo ./deploy.sh svc-start        # 启动
+sudo ./deploy.sh svc-stop         # 停止
+sudo ./deploy.sh svc-restart      # 重启
+sudo ./deploy.sh svc-status       # 查看状态
+sudo ./deploy.sh svc-log backend  # 查看后端日志 (journalctl)
+sudo ./deploy.sh svc-log frontend # 查看前端日志
+sudo ./deploy.sh svc-uninstall    # 卸载服务
+```
+
+#### 5. 可选：Nginx 反向代理
 
 ```nginx
 server {
@@ -207,11 +215,14 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### 备份
 
 ```bash
-# 备份数据库
+# 使用脚本备份
+./deploy.sh backup
+
+# 手动备份
 cp data/exam.db data/exam.db.backup.$(date +%Y%m%d)
 
-# 恢复数据库
-cp data/exam.db.backup.20260502 data/exam.db
+# 恢复
+./deploy.sh restore
 ```
 
 ## 默认账号
@@ -286,9 +297,33 @@ lsof -i :8000   # 后端
 lsof -i :5173   # 前端
 
 # 强制释放端口
-kill -9 <PID>
-# 或使用部署脚本
 ./deploy.sh stop
+# 或使用 systemd
+sudo ./deploy.sh svc-restart
+```
+
+### 虚拟环境问题
+
+```bash
+# 重新创建虚拟环境
+rm -rf venv/
+./deploy.sh install
+
+# 手动激活虚拟环境
+source venv/bin/activate
+python -m pip list
+```
+
+### 服务日志查看
+
+```bash
+# systemd 模式
+sudo ./deploy.sh svc-log backend
+sudo ./deploy.sh svc-log frontend
+
+# nohup 模式
+tail -f logs/backend.log
+tail -f logs/frontend.log
 ```
 
 ### 前端无法连接后端

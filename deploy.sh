@@ -1,7 +1,6 @@
 #!/bin/bash
 # Exam System Deployment & Management Script
 # Usage: ./deploy.sh [action]
-# Actions: start, stop, restart, status, install, build, prod
 
 set -e
 
@@ -9,9 +8,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 DATA_DIR="$SCRIPT_DIR/data"
+VENV_DIR="$SCRIPT_DIR/venv"
+# Detect OS
+VENV_PYTHON="$VENV_DIR/bin/python"
+VENV_PIP="$VENV_DIR/bin/pip"
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+    VENV_PYTHON="$VENV_DIR/Scripts/python.exe"
+    VENV_PIP="$VENV_DIR/Scripts/pip.exe"
+fi
 BACKEND_PORT=8000
 FRONTEND_PORT=5173
 PID_DIR="$SCRIPT_DIR/.pids"
+SERVICE_NAME_BACKEND="exam-backend"
+SERVICE_NAME_FRONTEND="exam-frontend"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,23 +38,27 @@ show_help() {
     echo "  stop             Stop both backend and frontend"
     echo "  restart          Restart both backend and frontend"
     echo "  status           Show service running status"
-    echo "  backend-start    Start backend only (port $BACKEND_PORT)"
-    echo "  backend-stop     Stop backend only"
-    echo "  backend-restart  Restart backend only"
-    echo "  frontend-start   Start frontend only (port $FRONTEND_PORT)"
-    echo "  frontend-stop    Stop frontend only"
-    echo "  frontend-restart Restart frontend only"
-    echo "  install          Install all dependencies"
+    echo "  install          Install dependencies (venv + npm)"
     echo "  build            Build frontend for production"
     echo "  prod             Start production mode (PRODUCTION=1)"
     echo "  backup           Backup database"
     echo "  restore          Restore database from latest backup"
-    echo "  help             Show this help message"
+    echo ""
+    echo -e "${YELLOW}Service Management (systemd):${NC}"
+    echo "  svc-install      Install backend/frontend as systemd services"
+    echo "  svc-start        Start services via systemd"
+    echo "  svc-stop         Stop services via systemd"
+    echo "  svc-restart      Restart services via systemd"
+    echo "  svc-status       Show systemd service status"
+    echo "  svc-uninstall    Remove systemd services"
+    echo "  svc-log [name]   View service logs (backend/frontend)"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
-    echo "  ./deploy.sh start"
-    echo "  ./deploy.sh restart"
-    echo "  ./deploy.sh prod"
+    echo "  ./deploy.sh install        # First-time setup"
+    echo "  ./deploy.sh start          # Dev mode (nohup)"
+    echo "  ./deploy.sh svc-install    # Install as system services"
+    echo "  ./deploy.sh svc-start      # Start via systemd"
+    echo "  ./deploy.sh svc-log backend  # View backend logs"
 }
 
 log_info()  { echo -e "${CYAN}$1${NC}"; }
@@ -55,17 +68,22 @@ log_error() { echo -e "${RED}$1${NC}"; }
 
 mkdir -p "$PID_DIR"
 
-# ─── Install ───────────────────────────────────────────────
-do_install() {
-    log_info "Installing backend dependencies..."
-    if command -v pip3 &>/dev/null; then
-        pip3 install -r "$BACKEND_DIR/requirements.txt"
-    elif command -v pip &>/dev/null; then
-        pip install -r "$BACKEND_DIR/requirements.txt"
-    else
-        log_error "pip not found. Please install Python 3.12+ first."
-        exit 1
+# ─── Virtual Environment ─────────────────────────────────
+ensure_venv() {
+    if [ ! -f "$VENV_PYTHON" ]; then
+        log_info "Creating Python virtual environment in venv/ ..."
+        python3 -m venv "$VENV_DIR"
+        log_ok "  Virtual environment created."
     fi
+}
+
+# ─── Install ─────────────────────────────────────────────
+do_install() {
+    ensure_venv
+
+    log_info "Installing backend dependencies (venv)..."
+    "$VENV_PIP" install -r "$BACKEND_DIR/requirements.txt"
+    log_ok "  Backend dependencies installed."
 
     log_info "Installing frontend dependencies..."
     if ! command -v npm &>/dev/null; then
@@ -73,17 +91,17 @@ do_install() {
         exit 1
     fi
     (cd "$FRONTEND_DIR" && npm install)
-    log_ok "All dependencies installed."
+    log_ok "  Frontend dependencies installed."
 }
 
-# ─── Build ─────────────────────────────────────────────────
+# ─── Build ───────────────────────────────────────────────
 do_build() {
     log_info "Building frontend for production..."
     (cd "$FRONTEND_DIR" && npm run build)
     log_ok "Build complete: $FRONTEND_DIR/dist/"
 }
 
-# ─── Port helpers ──────────────────────────────────────────
+# ─── Port helpers ────────────────────────────────────────
 kill_port() {
     local port=$1
     local pids
@@ -100,7 +118,7 @@ is_port_open() {
     lsof -i :$port &>/dev/null
 }
 
-# ─── Start Backend ─────────────────────────────────────────
+# ─── Start Backend ───────────────────────────────────────
 start_backend() {
     log_info "=== Starting backend (port $BACKEND_PORT) ==="
     if is_port_open $BACKEND_PORT; then
@@ -108,8 +126,11 @@ start_backend() {
         return 0
     fi
 
+    ensure_venv
+    mkdir -p "$SCRIPT_DIR/logs"
+
     cd "$BACKEND_DIR"
-    nohup python -m uvicorn main:app \
+    nohup "$VENV_PYTHON" -m uvicorn main:app \
         --host 0.0.0.0 \
         --port $BACKEND_PORT \
         --reload \
@@ -118,7 +139,6 @@ start_backend() {
     echo "$pid" > "$PID_DIR/backend.pid"
     log_info "  Backend PID: $pid"
 
-    # Wait for ready
     printf "  Waiting for backend..."
     for i in $(seq 1 40); do
         if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/health" > /dev/null 2>&1; then
@@ -132,7 +152,7 @@ start_backend() {
     return 1
 }
 
-# ─── Start Frontend ────────────────────────────────────────
+# ─── Start Frontend ──────────────────────────────────────
 start_frontend() {
     log_info "=== Starting frontend (port $FRONTEND_PORT) ==="
     if is_port_open $FRONTEND_PORT; then
@@ -140,8 +160,8 @@ start_frontend() {
         return 0
     fi
 
-    # Clean vite cache
     rm -rf "$FRONTEND_DIR/node_modules/.vite"
+    mkdir -p "$SCRIPT_DIR/logs"
 
     cd "$FRONTEND_DIR"
     nohup npx vite --port $FRONTEND_PORT \
@@ -150,7 +170,6 @@ start_frontend() {
     echo "$pid" > "$PID_DIR/frontend.pid"
     log_info "  Frontend PID: $pid"
 
-    # Wait for ready
     printf "  Waiting for frontend..."
     for i in $(seq 1 40); do
         if curl -sf "http://localhost:$FRONTEND_PORT" > /dev/null 2>&1; then
@@ -164,7 +183,7 @@ start_frontend() {
     return 1
 }
 
-# ─── Stop Backend ──────────────────────────────────────────
+# ─── Stop Backend ────────────────────────────────────────
 stop_backend() {
     log_info "=== Stopping backend ==="
     if [ -f "$PID_DIR/backend.pid" ]; then
@@ -178,12 +197,11 @@ stop_backend() {
         fi
         rm -f "$PID_DIR/backend.pid"
     fi
-    # Fallback: kill by port
     kill_port $BACKEND_PORT
     log_ok "Backend stopped."
 }
 
-# ─── Stop Frontend ─────────────────────────────────────────
+# ─── Stop Frontend ───────────────────────────────────────
 stop_frontend() {
     log_info "=== Stopping frontend ==="
     if [ -f "$PID_DIR/frontend.pid" ]; then
@@ -197,15 +215,13 @@ stop_frontend() {
         fi
         rm -f "$PID_DIR/frontend.pid"
     fi
-    # Fallback: kill by port
     kill_port $FRONTEND_PORT
-    # Also kill any remaining vite-related node processes
     pkill -f "npx.*vite" 2>/dev/null || true
     pkill -f "vite.*$FRONTEND_PORT" 2>/dev/null || true
     log_ok "Frontend stopped."
 }
 
-# ─── Services ──────────────────────────────────────────────
+# ─── Services ────────────────────────────────────────────
 do_start() {
     mkdir -p "$SCRIPT_DIR/logs"
     stop_backend
@@ -246,7 +262,7 @@ do_status() {
     fi
 }
 
-# ─── Production ────────────────────────────────────────────
+# ─── Production ──────────────────────────────────────────
 do_prod() {
     log_info "=== Starting production mode ==="
     mkdir -p "$SCRIPT_DIR/logs"
@@ -260,14 +276,13 @@ do_prod() {
         do_build
     fi
 
-    # Kill existing
     stop_backend
     kill_port $BACKEND_PORT
     sleep 1
 
     export PRODUCTION=1
     cd "$BACKEND_DIR"
-    nohup python -m uvicorn main:app \
+    nohup "$VENV_PYTHON" -m uvicorn main:app \
         --host 0.0.0.0 \
         --port $BACKEND_PORT \
         --workers 1 \
@@ -293,7 +308,7 @@ do_prod() {
     return 1
 }
 
-# ─── Backup / Restore ─────────────────────────────────────
+# ─── Backup / Restore ───────────────────────────────────
 do_backup() {
     if [ ! -f "$DATA_DIR/exam.db" ]; then
         log_error "Database not found at $DATA_DIR/exam.db"
@@ -318,7 +333,113 @@ do_restore() {
     log_ok "Database restored."
 }
 
-# ─── Main ──────────────────────────────────────────────────
+# ─── systemd Service Management ──────────────────────────
+svc_install() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Must run as root (sudo ./deploy.sh svc-install)"
+        exit 1
+    fi
+
+    ensure_venv
+    local real_dir
+    real_dir="$(realpath "$SCRIPT_DIR")"
+    local venv_real
+    venv_real="$(realpath "$VENV_DIR")"
+
+    # Backend service unit
+    cat > /etc/systemd/system/${SERVICE_NAME_BACKEND}.service <<SVCEOF
+[Unit]
+Description=Exam System Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$real_dir/backend
+ExecStart=$venv_real/bin/python -m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT --workers 1
+Restart=always
+RestartSec=5
+Environment=PRODUCTION=1
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    # Frontend service unit (production: serve static from backend)
+    cat > /etc/systemd/system/${SERVICE_NAME_FRONTEND}.service <<SVCEOF
+[Unit]
+Description=Exam System Frontend (Vite)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$real_dir/frontend
+ExecStart=/usr/bin/npx vite --host 0.0.0.0 --port $FRONTEND_PORT
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    systemctl daemon-reload
+    systemctl enable ${SERVICE_NAME_BACKEND}
+    systemctl enable ${SERVICE_NAME_FRONTEND}
+
+    log_ok ""
+    log_ok "=== Services installed and enabled ==="
+    log_ok "  Backend: $SERVICE_NAME_BACKEND"
+    log_ok "  Frontend: $SERVICE_NAME_FRONTEND"
+    log_ok ""
+    log_ok "Run 'sudo ./deploy.sh svc-start' to start them."
+}
+
+svc_uninstall() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Must run as root (sudo ./deploy.sh svc-uninstall)"
+        exit 1
+    fi
+
+    systemctl stop ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND} 2>/dev/null || true
+    systemctl disable ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND} 2>/dev/null || true
+    rm -f /etc/systemd/system/${SERVICE_NAME_BACKEND}.service
+    rm -f /etc/systemd/system/${SERVICE_NAME_FRONTEND}.service
+    systemctl daemon-reload
+
+    log_ok "Services removed."
+}
+
+svc_start() {
+    systemctl start ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND}
+    log_ok "Services started."
+}
+
+svc_stop() {
+    systemctl stop ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND}
+    log_ok "Services stopped."
+}
+
+svc_restart() {
+    systemctl restart ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND}
+    log_ok "Services restarted."
+}
+
+svc_status() {
+    systemctl status ${SERVICE_NAME_BACKEND} ${SERVICE_NAME_FRONTEND} --no-pager
+}
+
+svc_log() {
+    local target="${1:-backend}"
+    if [ "$target" = "backend" ]; then
+        journalctl -u ${SERVICE_NAME_BACKEND} -f --no-pager
+    elif [ "$target" = "frontend" ]; then
+        journalctl -u ${SERVICE_NAME_FRONTEND} -f --no-pager
+    else
+        log_error "Unknown service: $target (use 'backend' or 'frontend')"
+        exit 1
+    fi
+}
+
+# ─── Main ────────────────────────────────────────────────
 ACTION="${1:-help}"
 
 case "$ACTION" in
@@ -326,17 +447,18 @@ case "$ACTION" in
     stop)             do_stop ;;
     restart)          do_restart ;;
     status)           do_status ;;
-    backend-start)    mkdir -p "$SCRIPT_DIR/logs"; stop_backend; sleep 1; start_backend ;;
-    backend-stop)     stop_backend ;;
-    backend-restart)  stop_backend; sleep 2; start_backend ;;
-    frontend-start)   mkdir -p "$SCRIPT_DIR/logs"; stop_frontend; sleep 1; start_frontend ;;
-    frontend-stop)    stop_frontend ;;
-    frontend-restart) stop_frontend; sleep 2; start_frontend ;;
     install)          do_install ;;
     build)            do_build ;;
     prod)             do_prod ;;
     backup)           do_backup ;;
     restore)          do_restore ;;
+    svc-install)      svc_install ;;
+    svc-uninstall)    svc_uninstall ;;
+    svc-start)        svc_start ;;
+    svc-stop)         svc_stop ;;
+    svc-restart)      svc_restart ;;
+    svc-status)       svc_status ;;
+    svc-log)          svc_log "${2:-backend}" ;;
     help|-h|--help)   show_help ;;
     *)                log_error "Unknown action: $ACTION"; show_help; exit 1 ;;
 esac

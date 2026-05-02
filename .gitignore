@@ -4,3 +4,7 @@ data/*.db
 node_modules/
 frontend/dist/
 .superpowers/
+venv/
+logs/
+.pids/
+memory/
