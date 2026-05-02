@@ -13,15 +13,23 @@ router = APIRouter(prefix="/api/exams", tags=["exams"])
 
 
 @router.get("/available")
-def list_available_exams(db: Session = Depends(get_db)):
+def list_available_exams(db: Session = Depends(get_db), student: User = Depends(require_student)):
     now = datetime.utcnow()
+    # Papers that are active and within time window
     papers = db.query(Paper).filter(
         Paper.status == "active",
         Paper.window_start <= now,
         Paper.window_end >= now,
     ).all()
+    # Papers the student has already started
+    taken_paper_ids = set(
+        s[0] for s in db.query(ExamSession.paper_id)
+        .filter(ExamSession.student_id == student.id).all()
+    )
     result = []
     for p in papers:
+        if p.id in taken_paper_ids:
+            continue
         qc = db.query(PaperQuestion).filter(PaperQuestion.paper_id == p.id).count()
         result.append({"id": p.id, "title": p.title, "description": p.description,
                        "duration_minutes": p.duration_minutes, "window_start": p.window_start,
@@ -47,6 +55,13 @@ def start_exam(req: StartExamRequest, db: Session = Depends(get_db), student: Us
         ExamSession.status == "in_progress").first()
     if existing:
         return ExamSessionResponse.model_validate(existing)
+
+    # Already submitted — cannot retake
+    taken = db.query(ExamSession).filter(
+        ExamSession.student_id == student.id, ExamSession.paper_id == paper.id,
+        ExamSession.status != "in_progress").first()
+    if taken:
+        raise HTTPException(status_code=400, detail="You have already taken this exam")
 
     session = ExamSession(student_id=student.id, paper_id=paper.id, start_time=now)
     db.add(session)

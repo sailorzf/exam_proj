@@ -15,6 +15,7 @@ const routes = [
       { path: 'submissions', component: () => import('./views/teacher/Submissions.vue') },
       { path: 'submissions/grade/:id', component: () => import('./views/teacher/Grading.vue') },
       { path: 'grades', component: () => import('./views/teacher/Grades.vue') },
+      { path: 'admin', component: () => import('./views/admin/Users.vue') },
     ],
   },
   {

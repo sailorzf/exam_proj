@@ -35,7 +35,7 @@ async function handleLogin() {
   error.value = ''
   try {
     const { data } = await api.post('/login', { username: username.value, password: password.value })
-    setAuth(data.token, data.role, data.username)
+    setAuth(data.token, data.role, data.username, data.is_admin)
     router.push(data.role === 'teacher' ? '/teacher' : '/student')
   } catch (e) {
     error.value = e.response?.data?.detail || '登录失败'
@@ -46,13 +46,15 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.login-container { display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f5f5f5; }
-.login-card { background:white; padding:2rem; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:360px; }
-.login-card h1 { text-align:center; margin-bottom:1.5rem; }
-.form-group { margin-bottom:1rem; }
-.form-group label { display:block; margin-bottom:0.25rem; font-weight:500; }
-.form-group input { width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; }
-button { width:100%; padding:0.5rem; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:1rem; }
+.login-container { display:flex; justify-content:center; align-items:center; min-height:100vh; background:#fcf8ff; }
+.login-card { background:#fff; padding:2.5rem; border-radius:0.75rem; box-shadow:0 4px 20px rgba(53,37,205,0.1); width:400px; border:1px solid #e4e1ee; }
+.login-card h1 { text-align:center; margin-bottom:2rem; color:#3525cd; font-size:28px; }
+.form-group { margin-bottom:1.25rem; }
+.form-group label { display:block; margin-bottom:0.375rem; font-weight:500; font-size:14px; color:#464555; }
+.form-group input { width:100%; padding:0.75rem; border:1px solid rgba(119,117,135,0.3); border-radius:0.5rem; box-sizing:border-box; min-height:44px; }
+.form-group input:focus { border-color:#3525cd; box-shadow:0 0 0 3px rgba(53,37,205,0.1); outline:none; }
+button { width:100%; padding:0.75rem; background:#3525cd; color:#fff; border:none; border-radius:0.5rem; cursor:pointer; font-size:16px; font-weight:500; min-height:44px; transition:background 0.15s; }
+button:hover { background:#4f46e5; }
 button:disabled { opacity:0.6; cursor:not-allowed; }
-.error { color:red; font-size:0.875rem; margin-top:0.5rem; }
+.error { color:#ba1a1a; font-size:14px; margin-top:0.75rem; text-align:center; }
 </style>

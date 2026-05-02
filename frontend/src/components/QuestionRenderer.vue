@@ -41,10 +41,13 @@ function toggleOption(letter) {
 </script>
 
 <style scoped>
-.question-renderer { padding:1rem 0; }
-.question-renderer h3 { margin-bottom:1rem; }
+.question-renderer { padding:1.5rem 0; }
+.question-renderer h3 { margin-bottom:1.25rem; font-size:18px; line-height:1.4; }
 .options { display:flex; flex-direction:column; gap:0.75rem; }
-.option { display:flex; align-items:center; gap:0.5rem; padding:0.75rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; cursor:pointer; }
-.option:hover { background:#eff6ff; }
-.fill input, .essay textarea { width:100%; padding:0.5rem; border:1px solid #ddd; border-radius:4px; font-size:1rem; box-sizing:border-box; }
+.option { display:flex; align-items:center; gap:0.75rem; padding:0.875rem 1rem; background:#fff; border:1px solid #e4e1ee; border-radius:0.5rem; cursor:pointer; transition:all 0.15s; }
+.option:hover { background:#f5f2ff; border-color:#c7c4d8; }
+.option input { accent-color:#3525cd; width:18px; height:18px; }
+.fill input, .essay textarea { width:100%; padding:0.75rem; border:1px solid rgba(119,117,135,0.3); border-radius:0.5rem; font-size:16px; box-sizing:border-box; min-height:44px; }
+.fill input:focus, .essay textarea:focus { border-color:#3525cd; box-shadow:0 0 0 3px rgba(53,37,205,0.1); outline:none; }
+.essay textarea { line-height:1.7; resize:vertical; }
 </style>

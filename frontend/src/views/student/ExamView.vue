@@ -66,15 +66,22 @@ async function handleSubmit(){
 </script>
 
 <style scoped>
-.exam{min-height:100vh;display:flex;flex-direction:column;}
-.header{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:#1e293b;color:white;}
-.body{padding:1.5rem;flex:1;}
-.footer{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:#f8fafc;border-top:1px solid #e2e8f0;}
-.dots{display:flex;gap:0.25rem;flex-wrap:wrap;}
-.dots button{width:28px;height:28px;border:1px solid #e2e8f0;background:white;border-radius:4px;cursor:pointer;font-size:0.75rem;}
-.dots button.active{background:#3b82f6;color:white;}
-.dots button.answered{border-color:#10b981;}
-.marked{background:#f59e0b;color:white!important;}
-.submit{background:#ef4444;color:white;padding:0.5rem 1rem;border:none;border-radius:4px;cursor:pointer;}
-.loading{text-align:center;padding:2rem;}
+.exam { min-height:100vh; display:flex; flex-direction:column; }
+.header { display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1.5rem; background:#3525cd; color:#fff; }
+.header button { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:0.5rem; min-height:44px; padding:0.5rem 1rem; }
+.header button:hover { background:rgba(255,255,255,0.25); }
+.header button:disabled { opacity:0.4; cursor:not-allowed; }
+.body { padding:2rem; flex:1; }
+.footer { display:flex; justify-content:space-between; align-items:center; padding:0.75rem 1.5rem; background:#f0ecf9; border-top:1px solid #e4e1ee; gap:1rem; flex-wrap:wrap; }
+.footer button { padding:0.5rem 1rem; border:1px solid #c7c4d8; border-radius:0.5rem; background:#fff; cursor:pointer; min-height:44px; color:#464555; transition:all 0.15s; }
+.footer button:hover:not(:disabled) { border-color:#3525cd; color:#3525cd; }
+.footer button:disabled { opacity:0.4; cursor:not-allowed; }
+.footer .submit { background:#ba1a1a; color:#fff; border:none; }
+.footer .submit:hover { background:#dc2626; }
+.footer .marked { background:#f59e0b; color:#fff; border-color:#f59e0b; }
+.dots { display:flex; gap:0.375rem; flex-wrap:wrap; }
+.dots button { width:36px; height:36px; border:1px solid #c7c4d8; background:#fff; border-radius:0.5rem; cursor:pointer; font-size:14px; font-weight:500; transition:all 0.15s; }
+.dots button.active { background:#3525cd; color:#fff; border-color:#3525cd; }
+.dots button.answered { border-color:#10b981; background:rgba(16,185,129,0.1); }
+.loading { text-align:center; padding:3rem; color:#464555; }
 </style>

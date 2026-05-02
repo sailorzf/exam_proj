@@ -21,8 +21,8 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
 </script>
 
 <style scoped>
-.timer { font-size:1.2rem; font-weight:bold; font-family:monospace; }
-.warning { color:#f59e0b; }
-.danger { color:#ef4444; animation:blink 1s infinite; }
+.timer { font-size:1.2rem; font-weight:600; font-family:'Inter', monospace; letter-spacing:0.05em; padding:0.375rem 0.75rem; background:rgba(255,255,255,0.15); border-radius:0.5rem; }
+.warning { color:#fbbf24; }
+.danger { color:#fca5a5; animation:blink 1s infinite; }
 @keyframes blink { 50% { opacity:0.5; } }
 </style>

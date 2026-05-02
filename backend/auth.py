@@ -21,9 +21,9 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
-def create_token(user_id: int, role: str, username: str) -> str:
+def create_token(user_id: int, role: str, username: str, is_admin: bool = False) -> str:
     expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS)
-    payload = {"sub": str(user_id), "role": role, "username": username, "exp": expire}
+    payload = {"sub": str(user_id), "role": role, "username": username, "is_admin": is_admin, "exp": expire}
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -57,4 +57,10 @@ def require_teacher(current_user: User = Depends(get_current_user)) -> User:
 def require_student(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "student":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student access required")
+    return current_user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user

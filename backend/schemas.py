@@ -14,6 +14,7 @@ class LoginResponse(BaseModel):
     token: str
     role: str
     username: str
+    is_admin: bool = False
 
 
 class RegisterRequest(BaseModel):
@@ -66,6 +67,11 @@ class QuestionResponse(BaseModel):
 
 class ImportRequest(BaseModel):
     file_text: str
+
+
+class ImportWithCategoryRequest(BaseModel):
+    file_text: str
+    category: Optional[str] = None
 
 
 class ImportResponse(BaseModel):
@@ -165,12 +171,23 @@ class AnswerDetail(BaseModel):
     question_id: int
     question_text: str
     question_type: str
+    options: Optional[List[str]] = None
     student_answer: str
     correct_answer: str
     is_correct: Optional[bool]
     score: Optional[float]
     points: int
     teacher_comment: Optional[str] = None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def parse_options(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return None
+        return v
 
 
 class SubmissionDetail(BaseModel):
@@ -182,6 +199,7 @@ class SubmissionListItem(BaseModel):
     session_id: int
     paper_id: int
     student_username: str
+    student_name: Optional[str] = None
     status: str
     auto_score: Optional[float]
     manual_score: Optional[float]
@@ -192,5 +210,45 @@ class SubmissionListItem(BaseModel):
 class ResultListItem(BaseModel):
     session_id: int
     paper_title: str
+    auto_score: Optional[float]
+    manual_score: Optional[float]
     total_score: Optional[float]
     status: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    class_name: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    class_name: Optional[str] = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    is_admin: bool
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    class_name: Optional[str] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class UserImportResponse(BaseModel):
+    imported: int
+    errors: List[str] = []

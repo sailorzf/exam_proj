@@ -10,6 +10,7 @@ from routers import questions as questions_router
 from routers import papers as papers_router
 from routers import exams as exams_router
 from routers import grading as grading_router
+from routers import users as users_router
 
 app = FastAPI(title="Exam System")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -18,6 +19,7 @@ app.include_router(questions_router.router)
 app.include_router(papers_router.router)
 app.include_router(exams_router.router)
 app.include_router(grading_router.router)
+app.include_router(users_router.router)
 
 
 @app.on_event("startup")
@@ -30,8 +32,9 @@ def health():
     return {"status": "ok"}
 
 
+import os
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
-if FRONTEND_DIST.exists():
+if os.environ.get("PRODUCTION") and FRONTEND_DIST.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="static")
 
     @app.get("/{full_path:path}")

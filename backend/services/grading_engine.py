@@ -49,6 +49,8 @@ def grade_submission(db: Session, session: ExamSession) -> dict:
             graded_count += 1
 
     session.auto_score = auto_score
+    session.manual_score = 0.0
+    session.total_score = auto_score
     session.status = "submitted"
     db.flush()
     return {"auto_score": auto_score, "total_questions": len(answers), "graded_count": graded_count}

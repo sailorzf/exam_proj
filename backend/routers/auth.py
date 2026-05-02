@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 from schemas import LoginRequest, LoginResponse, RegisterRequest
-from auth import hash_password, verify_password, create_token, require_teacher
+from auth import hash_password, verify_password, create_token, require_teacher, require_admin
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -14,8 +14,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == req.username).first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    token = create_token(user.id, user.role, user.username)
-    return LoginResponse(token=token, role=user.role, username=user.username)
+    token = create_token(user.id, user.role, user.username, user.is_admin or False)
+    return LoginResponse(token=token, role=user.role, username=user.username, is_admin=user.is_admin or False)
 
 
 @router.post("/register")

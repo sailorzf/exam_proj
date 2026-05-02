@@ -10,10 +10,22 @@ class User(Base):
     username = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    is_admin = Column(Boolean, default=False)
+    name = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    class_name = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     papers = relationship("Paper", back_populates="creator", cascade="all, delete-orphan")
     questions = relationship("Question", back_populates="creator", cascade="all, delete-orphan")
     sessions = relationship("ExamSession", back_populates="student", cascade="all, delete-orphan")
+
+
+class Category(Base):
+    __tablename__ = "categories"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class Question(Base):

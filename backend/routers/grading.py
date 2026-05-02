@@ -27,6 +27,7 @@ def list_submissions(paper_id: int | None = None, db: Session = Depends(get_db),
         paper = db.query(Paper).filter(Paper.id == s.paper_id).first()
         result.append(SubmissionListItem(
             session_id=s.id, paper_id=s.paper_id, student_username=student.username if student else "Unknown",
+            student_name=student.name if student else None,
             status=s.status, auto_score=s.auto_score, manual_score=manual_score,
             total_score=total_score, submit_time=s.submit_time))
     return result
@@ -44,6 +45,7 @@ def get_submission_detail(session_id: int, db: Session = Depends(get_db), _teach
         pts = (a.paper_question.custom_points or q.points) if a.paper_question else q.points
         answer_details.append(AnswerDetail(
             id=a.id, question_id=q.id, question_text=q.question_text, question_type=q.type,
+            options=q.options,
             student_answer=a.student_answer, correct_answer=q.answer_text,
             is_correct=a.is_correct, score=a.score, points=pts, teacher_comment=a.teacher_comment))
     return SubmissionDetail(session=ExamSessionResponse.model_validate(session), answers=answer_details)
@@ -91,6 +93,7 @@ def list_results(db: Session = Depends(get_db), student: User = Depends(require_
     for s in sessions:
         paper = db.query(Paper).filter(Paper.id == s.paper_id).first()
         result.append(ResultListItem(session_id=s.id, paper_title=paper.title if paper else "Unknown",
+                      auto_score=s.auto_score, manual_score=s.manual_score,
                       total_score=s.total_score, status=s.status))
     return result
 
@@ -108,6 +111,7 @@ def get_result_detail(session_id: int, db: Session = Depends(get_db), student: U
         pts = (a.paper_question.custom_points or q.points) if a.paper_question else q.points
         answer_details.append(AnswerDetail(
             id=a.id, question_id=q.id, question_text=q.question_text, question_type=q.type,
+            options=q.options,
             student_answer=a.student_answer, correct_answer=q.answer_text,
             is_correct=a.is_correct, score=a.score, points=pts, teacher_comment=a.teacher_comment))
     return SubmissionDetail(session=ExamSessionResponse.model_validate(session), answers=answer_details)
