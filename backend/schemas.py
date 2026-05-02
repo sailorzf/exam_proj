@@ -166,6 +166,33 @@ class EssayScoreRequest(BaseModel):
     comment: Optional[str] = None
 
 
+class WrongAnswerDetail(BaseModel):
+    question_id: int
+    question_text: str
+    question_type: str
+    options: Optional[List[str]] = None
+    student_answer: str
+    correct_answer: str
+    score: Optional[float]
+    points: int
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def parse_options(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return None
+        return v
+
+
+class SubmitExamResponse(BaseModel):
+    session: ExamSessionResponse
+    grading: dict
+    wrong_answers: List[WrongAnswerDetail]
+
+
 class AnswerDetail(BaseModel):
     id: int
     question_id: int
@@ -252,3 +279,25 @@ class UserResponse(BaseModel):
 class UserImportResponse(BaseModel):
     imported: int
     errors: List[str] = []
+
+
+class UserProfileUpdate(BaseModel):
+    password: Optional[str] = None
+    old_password: Optional[str] = None
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    class_name: Optional[str] = None
+
+
+class UserProfileResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    class_name: Optional[str] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True

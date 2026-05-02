@@ -5,10 +5,31 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from schemas import UserCreate, UserUpdate, UserResponse, UserImportResponse
-from auth import hash_password, require_admin
+from schemas import UserCreate, UserUpdate, UserResponse, UserImportResponse, UserProfileUpdate, UserProfileResponse
+from auth import hash_password, verify_password, require_admin, get_current_user
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+
+@router.get("/profile", response_model=UserProfileResponse)
+def get_profile(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/profile", response_model=UserProfileResponse)
+def update_profile(req: UserProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if req.password:
+        if not req.old_password:
+            raise HTTPException(status_code=400, detail="请输入旧密码")
+        if not verify_password(req.old_password, current_user.password_hash):
+            raise HTTPException(status_code=400, detail="旧密码不正确")
+        current_user.password_hash = hash_password(req.password)
+    for field, value in req.model_dump(exclude_unset=True, exclude={"password", "old_password"}).items():
+        if value is not None:
+            setattr(current_user, field, value)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 
 @router.get("/", response_model=list[UserResponse])

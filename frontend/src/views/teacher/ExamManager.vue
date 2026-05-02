@@ -22,11 +22,11 @@ import { ref, onMounted } from 'vue'
 import api from '../../api'
 const papers = ref([]), pubPaper = ref(null), wStart = ref(''), wEnd = ref(''), dur = ref(60)
 function fmt(d){ return d?new Date(d+'Z').toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'-' }
-function toLocal(d){ const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` }
-function toUTC(d){ const pad=n=>String(n).padStart(2,'0'); const utc=new Date(d.toISOString().replace('Z','')); return `${utc.getUTCFullYear()}-${pad(utc.getUTCMonth()+1)}-${pad(utc.getUTCDate())}T${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}` }
+function toLocalInput(d){ const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` }
+function localToUTC(s){ return new Date(s).toISOString() }
 async function load(){ const { data }=await api.get('/papers/'); papers.value=data }
-function showPub(p){ pubPaper.value=p; const now=new Date(); const later=new Date(now.getTime()+3600000); wStart.value=toUTC(now); wEnd.value=toUTC(later); dur.value=60 }
-async function doPub(){ await api.post(`/papers/${pubPaper.value.id}/publish`,{window_start:wStart.value+'Z',window_end:wEnd.value+'Z',duration_minutes:dur.value}); pubPaper.value=null; await load() }
+function showPub(p){ pubPaper.value=p; const now=new Date(); const later=new Date(now.getTime()+3600000); wStart.value=toLocalInput(now); wEnd.value=toLocalInput(later); dur.value=60 }
+async function doPub(){ await api.post(`/papers/${pubPaper.value.id}/publish`,{window_start:localToUTC(wStart.value),window_end:localToUTC(wEnd.value),duration_minutes:dur.value}); pubPaper.value=null; await load() }
 async function doUnpub(p){ await api.put(`/papers/${p.id}/unpublish`); await load() }
 onMounted(load)
 </script>

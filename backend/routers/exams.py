@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Paper, PaperQuestion, Question, ExamSession, Answer
-from schemas import StartExamRequest, SaveAnswerRequest, ExamSessionResponse
+from schemas import StartExamRequest, SaveAnswerRequest, ExamSessionResponse, WrongAnswerDetail, SubmitExamResponse
 from auth import require_student
 from services.grading_engine import grade_submission
 
@@ -109,7 +109,7 @@ def save_answer(session_id: int, req: SaveAnswerRequest, db: Session = Depends(g
     return {"saved": True}
 
 
-@router.post("/{session_id}/submit")
+@router.post("/{session_id}/submit", response_model=SubmitExamResponse)
 def submit_exam(session_id: int, db: Session = Depends(get_db), student: User = Depends(require_student)):
     session = db.query(ExamSession).filter(ExamSession.id == session_id).first()
     if not session or session.student_id != student.id:
@@ -118,6 +118,29 @@ def submit_exam(session_id: int, db: Session = Depends(get_db), student: User = 
         raise HTTPException(status_code=400, detail="Exam already submitted")
     session.submit_time = datetime.utcnow()
     result = grade_submission(db, session)
+
+    # If no essay questions, auto-publish
+    essay_count = db.query(Question).join(Answer, Answer.question_id == Question.id)\
+        .filter(Answer.session_id == session.id, Question.type == 'essay').count()
+    if essay_count == 0:
+        session.status = 'published'
+
     db.commit()
     db.refresh(session)
-    return {"session": ExamSessionResponse.model_validate(session), "grading": result}
+
+    # Build wrong answers list
+    answers = db.query(Answer).filter(Answer.session_id == session.id).all()
+    wrong_answers = []
+    for answer in answers:
+        if answer.is_correct is False:
+            q = db.query(Question).filter(Question.id == answer.question_id).first()
+            if not q:
+                continue
+            pts = (answer.paper_question.custom_points or q.points) if answer.paper_question else q.points
+            wrong_answers.append(WrongAnswerDetail(
+                question_id=q.id, question_text=q.question_text, question_type=q.type,
+                options=q.options,
+                student_answer=answer.student_answer, correct_answer=q.answer_text,
+                score=answer.score, points=pts))
+
+    return SubmitExamResponse(session=ExamSessionResponse.model_validate(session), grading=result, wrong_answers=wrong_answers)

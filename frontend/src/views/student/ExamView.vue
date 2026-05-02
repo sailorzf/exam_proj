@@ -59,9 +59,9 @@ async function handleSubmit(){
   for(const idx in answers.value){
     if(answers.value[idx]){ const q=questions.value[parseInt(idx)]; if(q) await api.put(`/exams/${sessionId}/answer`,{question_id:q.question_id,answer:answers.value[idx]}) }
   }
-  await api.post(`/exams/${sessionId}/submit`)
+  const { data } = await api.post(`/exams/${sessionId}/submit`)
   localStorage.removeItem('ea_'+sessionId)
-  router.push('/student/results')
+  router.push({ path: `/student/wrong-answers/${sessionId}`, state: { wrongAnswers: data.wrong_answers || [] } })
 }
 </script>
 

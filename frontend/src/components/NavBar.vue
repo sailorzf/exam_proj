@@ -15,7 +15,7 @@
         <router-link to="/student/results">成绩</router-link>
       </div>
       <div class="nav-right">
-        <span class="user">{{ username }}</span>
+        <router-link :to="`/${role}/profile`" class="user">{{ username }}</router-link>
         <button @click="handleLogout">退出</button>
       </div>
     </nav>
@@ -47,7 +47,8 @@ function handleLogout() { clearAuth(); router.push('/login') }
 .nav-links a:hover { color:#fff; background:rgba(255,255,255,0.1); }
 .nav-links a.router-link-active { color:#fff; background:rgba(255,255,255,0.15); }
 .nav-right { margin-left:auto; display:flex; align-items:center; gap:1rem; }
-.nav-right .user { font-size:14px; color:rgba(255,255,255,0.9); }
+.nav-right .user { font-size:14px; color:rgba(255,255,255,0.9); text-decoration:none; cursor:pointer; transition:color 0.15s; }
+.nav-right .user:hover { color:#fff; text-decoration:underline; }
 .nav-right button { padding:0.5rem 1rem; background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:0.5rem; cursor:pointer; font-size:14px; font-weight:500; min-height:44px; transition:all 0.15s; }
 .nav-right button:hover { background:rgba(255,255,255,0.25); }
 .content { padding:1.5rem; max-width:1280px; margin:0 auto; }

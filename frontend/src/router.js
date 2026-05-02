@@ -16,6 +16,7 @@ const routes = [
       { path: 'submissions/grade/:id', component: () => import('./views/teacher/Grading.vue') },
       { path: 'grades', component: () => import('./views/teacher/Grades.vue') },
       { path: 'admin', component: () => import('./views/admin/Users.vue') },
+      { path: 'profile', component: () => import('./views/common/Profile.vue') },
     ],
   },
   {
@@ -26,6 +27,8 @@ const routes = [
       { path: 'exams', component: () => import('./views/student/ExamList.vue') },
       { path: 'exam/:id', component: () => import('./views/student/ExamView.vue') },
       { path: 'results', component: () => import('./views/student/Results.vue') },
+      { path: 'wrong-answers/:id', component: () => import('./views/student/WrongAnswers.vue') },
+      { path: 'profile', component: () => import('./views/common/Profile.vue') },
     ],
   },
   { path: '/', redirect: '/login' },
