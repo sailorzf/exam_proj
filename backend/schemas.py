@@ -180,6 +180,7 @@ class SubmissionDetail(BaseModel):
 
 class SubmissionListItem(BaseModel):
     session_id: int
+    paper_id: int
     student_username: str
     status: str
     auto_score: Optional[float]

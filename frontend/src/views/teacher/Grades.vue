@@ -1,22 +1,50 @@
 <template>
   <div>
     <h2>成绩列表</h2>
-    <table><thead><tr><th>学生</th><th>自动分</th><th>手动分</th><th>总分</th><th>状态</th><th>提交时间</th></tr></thead>
-      <tbody><tr v-for="s in subs" :key="s.session_id"><td>{{ s.student_username }}</td><td>{{ s.auto_score??'-' }}</td><td>{{ s.manual_score??'-' }}</td>
-        <td><strong>{{ s.total_score??'-' }}</strong></td><td>{{ s.status }}</td><td>{{ s.submit_time?new Date(s.submit_time).toLocaleString():'-' }}</td></tr></tbody>
+    <div class="filter-bar">
+      <label>考试筛选：</label>
+      <select v-model="paperId" @change="load">
+        <option value="">全部</option>
+        <option v-for="p in papers" :key="p.id" :value="p.id">{{ p.title }}</option>
+      </select>
+    </div>
+    <table><thead><tr><th>考试轮次</th><th>学生姓名</th><th>客观分</th><th>主观分</th><th>总分</th></tr></thead>
+      <tbody><tr v-for="s in sortedSubs" :key="s.session_id"><td>{{ paperName(s) }}</td><td>{{ s.student_username }}</td>
+        <td>{{ s.auto_score??0 }}</td><td>{{ s.manual_score??0 }}</td>
+        <td><strong>{{ (s.auto_score||0) + (s.manual_score||0) }}</strong></td></tr></tbody>
     </table>
-    <p v-if="!subs.length">暂无答卷</p>
+    <p v-if="!sortedSubs.length">暂无答卷</p>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
-const subs = ref([])
-async function load(){ const { data }=await api.get('/submissions'); subs.value=data }
-onMounted(load)
+const subs = ref([]), papers = ref([]), paperId = ref('')
+
+const sortedSubs = computed(() => {
+  return [...subs.value].sort((a, b) => ((b.auto_score||0) + (b.manual_score||0)) - ((a.auto_score||0) + (a.manual_score||0)))
+})
+
+const paperMap = computed(() => {
+  const m = {}
+  papers.value.forEach(p => m[p.id] = p.title)
+  return m
+})
+
+function paperName(s) { return paperMap.value[s.paper_id] || '-' }
+
+async function load(){
+  const params = paperId.value ? `?paper_id=${paperId.value}` : ''
+  const { data } = await api.get(`/submissions${params}`)
+  subs.value = data
+}
+async function loadPapers(){ const { data }=await api.get('/papers/'); papers.value=data }
+onMounted(()=>{ load(); loadPapers() })
 </script>
 
 <style scoped>
 table{width:100%;border-collapse:collapse;} th,td{padding:0.5rem;text-align:left;border-bottom:1px solid #e2e8f0;}
+.filter-bar{margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;}
+.filter-bar select{padding:0.25rem 0.5rem;border:1px solid #ddd;border-radius:4px;}
 </style>

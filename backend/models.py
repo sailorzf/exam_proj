@@ -28,7 +28,7 @@ class Question(Base):
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, server_default=func.now())
     creator = relationship("User", back_populates="questions")
-    paper_questions = relationship("PaperQuestion", back_populates="question")
+    paper_questions = relationship("PaperQuestion", back_populates="question", cascade="all, delete-orphan")
     answers = relationship("Answer", back_populates="question", cascade="all, delete-orphan")
 
 

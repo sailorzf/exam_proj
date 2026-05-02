@@ -9,9 +9,9 @@ from auth import require_teacher, require_student
 
 router = APIRouter(prefix="/api", tags=["grading"])
 
-
 @router.get("/submissions", response_model=list[SubmissionListItem])
 def list_submissions(paper_id: int | None = None, db: Session = Depends(get_db), _teacher: User = Depends(require_teacher)):
+    """List submissions with optional paper filter"""
     q = db.query(ExamSession)
     if paper_id:
         q = q.filter(ExamSession.paper_id == paper_id)
@@ -19,13 +19,14 @@ def list_submissions(paper_id: int | None = None, db: Session = Depends(get_db),
     result = []
     for s in sessions:
         student = db.query(User).filter(User.id == s.student_id).first()
-        essay_scores = db.query(Answer).filter(Answer.session_id == s.id, Answer.score.isnot(None)).all()
-        manual = sum(a.score or 0 for a in essay_scores)
-        manual_score = manual if manual > 0 else (s.manual_score or 0)
+        essay_total = db.query(Answer).join(Question, Question.id == Answer.question_id)\
+            .filter(Answer.session_id == s.id, Question.type == 'essay', Answer.score.isnot(None))\
+            .with_entities(func.sum(Answer.score)).scalar()
+        manual_score = essay_total or 0
         total_score = (s.auto_score or 0) + manual_score
         paper = db.query(Paper).filter(Paper.id == s.paper_id).first()
         result.append(SubmissionListItem(
-            session_id=s.id, student_username=student.username if student else "Unknown",
+            session_id=s.id, paper_id=s.paper_id, student_username=student.username if student else "Unknown",
             status=s.status, auto_score=s.auto_score, manual_score=manual_score,
             total_score=total_score, submit_time=s.submit_time))
     return result
@@ -58,7 +59,9 @@ def score_answer(answer_id: int, req: EssayScoreRequest, db: Session = Depends(g
     db.commit()
     session = db.query(ExamSession).filter(ExamSession.id == answer.session_id).first()
     if session:
-        essay_total = db.query(Answer).filter(Answer.session_id == session.id, Answer.score.isnot(None)).with_entities(func.sum(Answer.score)).scalar()
+        essay_total = db.query(Answer).join(Question, Question.id == Answer.question_id)\
+            .filter(Answer.session_id == session.id, Question.type == 'essay', Answer.score.isnot(None))\
+            .with_entities(func.sum(Answer.score)).scalar()
         session.manual_score = essay_total or 0
         session.total_score = (session.auto_score or 0) + (session.manual_score or 0)
         db.commit()
@@ -70,7 +73,9 @@ def publish_submission(session_id: int, db: Session = Depends(get_db), _teacher:
     session = db.query(ExamSession).filter(ExamSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Submission not found")
-    essay_total = db.query(Answer).filter(Answer.session_id == session_id, Answer.score.isnot(None)).with_entities(func.sum(Answer.score)).scalar()
+    essay_total = db.query(Answer).join(Question, Question.id == Answer.question_id)\
+        .filter(Answer.session_id == session_id, Question.type == 'essay', Answer.score.isnot(None))\
+        .with_entities(func.sum(Answer.score)).scalar()
     session.manual_score = essay_total or 0
     session.total_score = (session.auto_score or 0) + (session.manual_score or 0)
     session.status = "published"

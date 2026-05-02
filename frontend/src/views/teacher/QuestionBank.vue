@@ -11,17 +11,18 @@
       <ul v-if="importResult?.errors?.length"><li v-for="e in importResult.errors" :key="e">{{ e }}</li></ul>
     </div></div>
     <div v-if="showAdd" class="modal"><div class="modal-content">
-      <h3>新增题目</h3>
+      <h3>{{ editingId ? '编辑题目' : '新增题目' }}</h3>
       <select v-model="nq.type"><option value="choice_single">单选题</option><option value="choice_multi">多选题</option><option value="fill_blank">填空题</option><option value="essay">简答题</option></select>
       <input v-model="nq.question_text" placeholder="题目内容" />
       <textarea v-if="nq.type.startsWith('choice')" v-model="nq.options_raw" placeholder="每行一个选项" rows="4"></textarea>
       <input v-model="nq.answer_text" placeholder="答案" />
       <input v-model.number="nq.points" type="number" placeholder="分值" />
-      <div class="modal-actions"><button @click="doAdd" :disabled="adding">{{ adding?'保存中...':'保存' }}</button><button @click="showAdd=false">取消</button></div>
+      <div class="modal-actions"><button @click="doSave" :disabled="saving">{{ saving?'保存中...':'保存' }}</button><button @click="cancelEdit">取消</button></div>
     </div></div>
     <table v-if="questions.length">
       <thead><tr><th>ID</th><th>类型</th><th>题目</th><th>答案</th><th>分值</th><th>操作</th></tr></thead>
-      <tbody><tr v-for="q in questions" :key="q.id"><td>{{ q.id }}</td><td>{{ typeLabel(q.type) }}</td><td>{{ trunc(q.question_text,50) }}</td><td>{{ trunc(q.answer_text,30) }}</td><td>{{ q.points }}</td><td><button class="danger" @click="doDelete(q.id)">删除</button></td></tr></tbody>
+      <tbody><tr v-for="q in questions" :key="q.id"><td>{{ q.id }}</td><td>{{ typeLabel(q.type) }}</td><td>{{ trunc(q.question_text,50) }}</td><td>{{ trunc(q.answer_text,30) }}</td><td>{{ q.points }}</td>
+        <td><button @click="openEdit(q)">编辑</button> <button class="danger" @click="doDelete(q.id)">删除</button></td></tr></tbody>
     </table>
     <p v-else>暂无题目</p>
   </div>
@@ -32,7 +33,8 @@ import { ref, onMounted } from 'vue'
 import api from '../../api'
 const questions = ref([])
 const showImport = ref(false), showAdd = ref(false)
-const importText = ref(''), importResult = ref(null), importing = ref(false), adding = ref(false)
+const importText = ref(''), importResult = ref(null), importing = ref(false), saving = ref(false)
+const editingId = ref(null)
 const nq = ref({ type:'choice_single', question_text:'', options_raw:'', answer_text:'', points:5 })
 const typeLabels = { choice_single:'单选', choice_multi:'多选', fill_blank:'填空', essay:'简答' }
 function typeLabel(t) { return typeLabels[t]||t }
@@ -40,8 +42,42 @@ function trunc(s,n) { return s&&s.length>n ? s.slice(0,n)+'...' : s }
 async function loadQuestions() { const { data } = await api.get('/questions/'); questions.value = data }
 async function doImport() { importing.value=true; try { const { data } = await api.post('/questions/import',{file_text:importText.value}); importResult.value=data; await loadQuestions() } finally { importing.value=false } }
 function parseOpts(raw) { return raw.split('\n').map(l=>l.replace(/^[A-Z][\.\)]\s*/,'').trim()).filter(Boolean) }
-async function doAdd() { adding.value=true; try { const body={type:nq.value.type, question_text:nq.value.question_text, answer_text:nq.value.answer_text, points:nq.value.points}; if(nq.value.type.startsWith('choice')) body.options=parseOpts(nq.value.options_raw); await api.post('/questions/',body); showAdd.value=false; nq.value={type:'choice_single',question_text:'',options_raw:'',answer_text:'',points:5}; await loadQuestions() } finally { adding.value=false } }
-async function doDelete(id) { if(confirm('确认删除？')){ await api.delete(`/questions/${id}`); await loadQuestions() } }
+function parseOptsFromQuestion(q) { if (q.options && Array.isArray(q.options)) return q.options.join('\n'); return '' }
+function openEdit(q) {
+  editingId.value = q.id
+  nq.value = { type: q.type, question_text: q.question_text, options_raw: parseOptsFromQuestion(q), answer_text: q.answer_text, points: q.points }
+  showAdd.value = true
+}
+function cancelEdit() {
+  editingId.value = null
+  showAdd.value = false
+  nq.value = { type:'choice_single', question_text:'', options_raw:'', answer_text:'', points:5 }
+}
+async function doSave() {
+  saving.value = true
+  try {
+    const body = { type: nq.value.type, question_text: nq.value.question_text, answer_text: nq.value.answer_text, points: nq.value.points }
+    if (nq.value.type.startsWith('choice')) body.options = parseOpts(nq.value.options_raw)
+    if (editingId.value) {
+      await api.put(`/questions/${editingId.value}`, body)
+    } else {
+      await api.post('/questions/', body)
+    }
+    cancelEdit()
+    await loadQuestions()
+  } finally { saving.value = false }
+}
+async function doAdd() { await doSave() }
+async function doDelete(id) {
+  if (!confirm('确认删除？')) return
+  try {
+    await api.delete(`/questions/${id}`)
+    await loadQuestions()
+  } catch (e) {
+    const detail = e.response?.data?.detail || '删除失败'
+    alert(detail)
+  }
+}
 onMounted(loadQuestions)
 </script>
 

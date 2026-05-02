@@ -13,6 +13,7 @@ const routes = [
       { path: 'papers', component: () => import('./views/teacher/PaperBuilder.vue') },
       { path: 'exams', component: () => import('./views/teacher/ExamManager.vue') },
       { path: 'submissions', component: () => import('./views/teacher/Submissions.vue') },
+      { path: 'submissions/grade/:id', component: () => import('./views/teacher/Grading.vue') },
       { path: 'grades', component: () => import('./views/teacher/Grades.vue') },
     ],
   },

@@ -1,4 +1,5 @@
 # backend/routers/papers.py
+import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -33,12 +34,42 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
     return p
 
 
-@router.get("/{paper_id}/questions", response_model=list[PaperQuestionResponse])
+@router.get("/{paper_id}/questions")
 def get_paper_questions(paper_id: int, db: Session = Depends(get_db)):
     p = db.query(Paper).filter(Paper.id == paper_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Paper not found")
-    return db.query(PaperQuestion).filter(PaperQuestion.paper_id == paper_id).order_by(PaperQuestion.order_index).all()
+    pqs = db.query(PaperQuestion).filter(PaperQuestion.paper_id == paper_id).order_by(PaperQuestion.order_index).all()
+    result = []
+    for pq in pqs:
+        q = db.query(Question).filter(Question.id == pq.question_id).first()
+        if q:
+            result.append({
+                "pq_id": pq.id, "paper_id": pq.paper_id, "question_id": pq.question_id,
+                "order_index": pq.order_index, "custom_points": pq.custom_points,
+                "type": q.type, "question_text": q.question_text,
+                "options": json.loads(q.options) if q.options else None,
+                "answer_text": q.answer_text, "points": q.points,
+            })
+    return result
+
+
+@router.delete("/{paper_id}/questions/{pq_id}", status_code=204)
+def delete_paper_question(paper_id: int, pq_id: int, db: Session = Depends(get_db), _teacher: User = Depends(require_teacher)):
+    pq = db.query(PaperQuestion).filter(PaperQuestion.id == pq_id, PaperQuestion.paper_id == paper_id).first()
+    if not pq:
+        raise HTTPException(status_code=404, detail="Paper question not found")
+    db.delete(pq)
+    db.commit()
+
+
+@router.post("/{paper_id}/questions/clear", status_code=204)
+def clear_paper_questions(paper_id: int, db: Session = Depends(get_db), _teacher: User = Depends(require_teacher)):
+    p = db.query(Paper).filter(Paper.id == paper_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    db.query(PaperQuestion).filter(PaperQuestion.paper_id == paper_id).delete()
+    db.commit()
 
 
 @router.put("/{paper_id}", response_model=PaperResponse)

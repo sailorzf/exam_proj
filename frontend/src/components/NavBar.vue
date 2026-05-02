@@ -6,7 +6,7 @@
         <router-link to="/teacher/questions">题库</router-link>
         <router-link to="/teacher/papers">试卷</router-link>
         <router-link to="/teacher/exams">发布</router-link>
-        <router-link to="/teacher/submissions">答卷</router-link>
+        <router-link to="/teacher/submissions">阅卷</router-link>
         <router-link to="/teacher/grades">成绩</router-link>
       </div>
       <div class="nav-links" v-else-if="isStudent">
@@ -25,10 +25,13 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getUsername, isTeacher, isStudent, clearAuth } from '../auth'
+import { getUsername, getRole, clearAuth } from '../auth'
 
 const router = useRouter()
 const username = computed(getUsername)
+const role = computed(getRole)
+const isTeacher = computed(() => role.value === 'teacher')
+const isStudent = computed(() => role.value === 'student')
 function handleLogout() { clearAuth(); router.push('/login') }
 </script>
 
