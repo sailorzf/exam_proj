@@ -102,3 +102,10 @@ class Answer(Base):
     session = relationship("ExamSession", back_populates="answers")
     question = relationship("Question", back_populates="answers")
     paper_question = relationship("PaperQuestion", back_populates="answers")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, nullable=False, index=True)
+    value = Column(Text, nullable=True)

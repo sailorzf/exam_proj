@@ -11,6 +11,7 @@ from routers import papers as papers_router
 from routers import exams as exams_router
 from routers import grading as grading_router
 from routers import users as users_router
+from routers import settings as settings_router
 
 app = FastAPI(title="Exam System")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -20,11 +21,18 @@ app.include_router(papers_router.router)
 app.include_router(exams_router.router)
 app.include_router(grading_router.router)
 app.include_router(users_router.router)
+app.include_router(settings_router.router)
 
 
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+import os
+UPLOADS_DIR = Path(__file__).parent / "uploads"
+if UPLOADS_DIR.exists():
+    app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 @app.get("/api/health")

@@ -15,7 +15,11 @@ const routes = [
       { path: 'submissions', component: () => import('./views/teacher/Submissions.vue') },
       { path: 'submissions/grade/:id', component: () => import('./views/teacher/Grading.vue') },
       { path: 'grades', component: () => import('./views/teacher/Grades.vue') },
-      { path: 'admin', component: () => import('./views/admin/Users.vue') },
+      { path: 'admin', component: () => import('./views/admin/AdminLayout.vue'), children: [
+        { path: '', redirect: '/teacher/admin/users' },
+        { path: 'users', component: () => import('./views/admin/Users.vue') },
+        { path: 'settings', component: () => import('./views/admin/Settings.vue') },
+      ]},
       { path: 'profile', component: () => import('./views/common/Profile.vue') },
     ],
   },

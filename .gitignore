@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 data/*.db
+uploads/
 node_modules/
 frontend/dist/
 .superpowers/
