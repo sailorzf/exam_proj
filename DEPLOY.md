@@ -51,7 +51,13 @@ exam-proj/
 │       ├── papers.py        # 试卷管理
 │       ├── exams.py         # 考试流程
 │       ├── grading.py       # 阅卷管理
-│       └── users.py         # 用户管理 + Profile
+│       ├── users.py         # 用户管理 + Profile
+│       └── settings.py      # 系统设置 + 图片上传
+│   ├── services/            # 业务逻辑
+│   │   ├── question_parser.py  # 题目解析器
+│   │   ├── exam_engine.py      # 组卷引擎
+│   │   └── grading_engine.py   # 自动批改引擎
+│   └── uploads/             # 用户上传的背景图片(git忽略)
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.js
@@ -67,8 +73,10 @@ exam-proj/
 ├── data/                    # 运行时生成 (数据库文件)
 ├── venv/                    # Python 虚拟环境 (自动生成)
 ├── logs/                    # 运行日志 (自动生成)
+├── uploads/                 # 上传的背景图片(自动生成, git忽略)
 ├── manage.ps1               # Windows 管理脚本
 ├── deploy.sh                # Linux 部署脚本 (支持 systemd)
+├── 题库模板.txt              # 题目导入模板
 └── DEPLOY.md                # 本文件
 ```
 
@@ -235,7 +243,8 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 1. 创建 SQLite 数据库文件 `data/exam.db`
 2. 创建所有数据库表
 3. 创建默认管理员账号：`admin / admin123`（角色：teacher，is_admin：true）
-4. 对已有数据库进行缺失字段迁移
+4. 创建默认系统设置（背景图、copyright 文本）
+5. 对已有数据库进行缺失字段迁移
 
 ### 备份
 
@@ -311,6 +320,12 @@ cp data/exam.db data/exam.db.backup.$(date +%Y%m%d)
 ### 个人设置 (所有用户)
 - `GET /api/users/profile` — 获取个人资料
 - `PUT /api/users/profile` — 更新个人资料（含改密）
+
+### 系统设置 (管理员)
+- `GET /api/settings/` — 获取系统设置
+- `PUT /api/settings/` — 更新系统设置
+- `POST /api/settings/upload-image` — 上传背景图片(16:9 裁剪)
+- `GET /api/uploads/{filename}` — 获取上传的图片
 
 ## 故障排查
 

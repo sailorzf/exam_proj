@@ -24,9 +24,9 @@
 
 | 角色 | 说明 |
 |------|------|
+| 管理员 (admin) | 用户管理、系统设置(背景图/copyright)、拥有教师全部权限 |
 | 教师 (teacher) | 管理题库、组卷、发布考试、阅卷、查看成绩 |
-| 学生 (student) | 查看可参加的考试、在线答题、查看已发布的成绩 |
-| 管理员 | 暂无独立角色，教师具备用户注册权限 |
+| 学生 (student) | 查看可参加的考试、在线答题、查看已发布的成绩、错题回顾 |
 
 ---
 
@@ -124,6 +124,40 @@ A: A,C,D
 | RS-1 | 已发布成绩列表 | 仅展示 status = published 的考试 |
 | RS-2 | 成绩详情 | 查看每道题的学生答案、正确答案(主观题不显示)、得分、教师评语 |
 
+### 3.9 错题回顾 (学生)
+
+| 编号 | 功能 | 说明 |
+|------|------|------|
+| WA-1 | 错题列表 | 展示自己在已交卷考试中答错的题目 |
+| WA-2 | 错题详情 | 查看题目、自己的答案、正确答案 |
+
+### 3.10 个人资料 (所有用户)
+
+| 编号 | 功能 | 说明 |
+|------|------|------|
+| PF-1 | 查看资料 | 显示用户名、性别、手机号、班级等信息 |
+| PF-2 | 编辑资料 | 修改姓名、性别、手机号、班级 |
+| PF-3 | 修改密码 | 验证旧密码后设置新密码 |
+
+### 3.11 用户管理 (管理员)
+
+| 编号 | 功能 | 说明 |
+|------|------|------|
+| UM-1 | 用户列表 | 展示所有用户，支持按角色筛选 |
+| UM-2 | 创建用户 | 手动添加教师/学生账号 |
+| UM-3 | 编辑用户 | 修改用户信息和角色 |
+| UM-4 | 删除用户 | 删除指定用户 |
+| UM-5 | 批量导入 | CSV 批量导入学生/教师账号 |
+| UM-6 | 下载模板 | 下载 CSV 导入模板文件 |
+
+### 3.12 系统设置 (管理员)
+
+| 编号 | 功能 | 说明 |
+|------|------|------|
+| SS-1 | 背景图片 | 上传本地图片(支持裁剪 16:9)，应用于登录页 |
+| SS-2 | Copyright 文本 | 自定义页脚版权文本 |
+| SS-3 | 图片规格 | 支持 JPG/PNG/WebP，建议 1920×1080，不超过 5MB |
+
 ---
 
 ## 4. 数据模型
@@ -209,6 +243,13 @@ User 1 ────< Paper 1 ────< PaperQuestion >──── 1 Questio
 | score | FLOAT | 得分 |
 | teacher_comment | TEXT | 教师评语 |
 
+**system_settings**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK | |
+| key | STRING UNIQUE | 设置键名(background_image / copyright_text) |
+| value | TEXT | 设置值 |
+
 ---
 
 ## 5. 业务规则
@@ -241,6 +282,7 @@ Session: in_progress →(交卷)→ submitted →(发布)→ published
 
 - 题库/试卷/发布/答卷/阅卷/成绩 页面 — 仅教师可访问
 - 考试列表/答题/成绩查询 页面 — 仅学生可访问
+- 用户管理/系统设置 页面 — 仅管理员可访问
 - 注册接口 — 需教师 token
 - 所有写操作 — 后端校验 token 角色
 
@@ -268,7 +310,7 @@ Session: in_progress →(交卷)→ submitted →(发布)→ published
 ## 7. 前端路由结构
 
 ```
-/login                          — 登录页
+/login                          — 登录页(支持自定义背景图)
 /teacher/                       — 教师布局(重定向到 questions)
   /teacher/questions            — 题库管理
   /teacher/papers               — 试卷管理
@@ -276,10 +318,17 @@ Session: in_progress →(交卷)→ submitted →(发布)→ published
   /teacher/submissions          — 答卷列表
   /teacher/submissions/grade/:id — 阅卷详情
   /teacher/grades               — 成绩总览
+  /teacher/wrong-answers        — 学生错题查看(教师视角)
+  /teacher/admin                — 管理后台(左侧导航)
+    /teacher/admin/users        — 用户管理
+    /teacher/admin/settings     — 系统设置
 /student/                       — 学生布局(重定向到 exams)
   /student/exams                — 考试列表
   /student/exam/:id             — 答题页面
   /student/results              — 成绩查询
+  /student/wrong-answers        — 错题回顾
+  /student/profile              — 个人资料
+/teacher/profile                — 教师个人资料
 ```
 
 ---
@@ -318,6 +367,10 @@ Session: in_progress →(交卷)→ submitted →(发布)→ published
 - [x] 成绩查询(学生)
 - [x] 成绩总览 + 答卷列表
 - [x] PowerShell 服务管理脚本
+- [x] 用户管理(管理员): 增删改查、CSV 批量导入
+- [x] 系统设置(管理员): 背景图片上传裁剪、Copyright 自定义
+- [x] 学生错题回顾
+- [x] 个人资料编辑(含修改密码)
 
 ### 9.2 建议后续迭代
 - [ ] 考试倒计时 + 超时自动交卷

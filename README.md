@@ -10,11 +10,20 @@
 - **考试发布** — 设置考试时间窗口和时长，发布/下架考试
 - **阅卷** — 查看已提交答卷，手动评分简答题并添加评语，发布成绩
 - **成绩总览** — 按考试筛选查看所有答卷，按总分排序，展示客观分/主观分明细
+- **用户管理** — 教师/学生账号的增删改查；CSV 批量导入；下载导入模板
+- **错题本** — 查看学生考试中的错题及正确答案
 
 ### 学生端
 - **考试列表** — 浏览当前时间窗口内可参加的考试
 - **在线答题** — 答题过程中自动保存答案；支持计时器；完成后交卷
 - **成绩查询** — 查看已公布的成绩及每道题的反馈
+- **错题回顾** — 查看自己在考试中答错的题目和正确答案
+- **个人资料** — 修改姓名、性别、手机号、班级、密码等个人信息
+
+### 系统设置 (管理员)
+- **背景图片** — 支持本地上传图片（16:9 裁剪），应用于登录页
+- **Copyright 文本** — 自定义页脚版权文本
+- **管理员账号** — 默认 admin / admin123
 
 ## 技术栈
 
@@ -26,6 +35,7 @@
 **前端：**
 - Vue 3 (Composition API, `<script setup>`)
 - Vue Router / Axios / Vite
+- vue-advanced-cropper（图片裁剪）
 
 ## 快速开始
 
@@ -62,6 +72,7 @@ npx vite --port 5173
 - 前端地址: http://localhost:5173
 
 ### 默认账号
+- 管理员: `admin` / `admin123`
 - 教师: `teacher` / `teacher123`
 - 学生: `student` / `student123`
 
@@ -70,6 +81,8 @@ npx vite --port 5173
 ```
 exam-proj/
 ├── manage.ps1                  # 服务管理脚本
+├── deploy.sh                   # Linux 部署脚本 (支持 systemd)
+├── 题库模板.txt                 # 题目导入模板
 ├── backend/
 │   ├── main.py                 # FastAPI 应用入口
 │   ├── models.py               # SQLAlchemy 数据模型
@@ -82,10 +95,12 @@ exam-proj/
 │   │   ├── questions.py        # 题目 CRUD 和导入
 │   │   ├── papers.py           # 试卷 CRUD 和发布
 │   │   ├── exams.py            # 考试会话和答题提交
-│   │   └── grading.py          # 阅卷、评分、成绩查询
+│   │   ├── grading.py          # 阅卷、评分、成绩查询
+│   │   ├── users.py            # 用户管理 + Profile
+│   │   └── settings.py         # 系统设置 + 图片上传
 │   └── services/
 │       ├── question_parser.py  # 文本格式题目解析器
-│       └── exam_engine.py      # 组卷引擎(指定/随机)
+│       ├── exam_engine.py      # 组卷引擎(指定/随机)
 │       └── grading_engine.py   # 自动批改引擎
 └── frontend/
     ├── src/
@@ -93,10 +108,13 @@ exam-proj/
     │   ├── router.js           # Vue Router 路由配置
     │   ├── api.js              # Axios 实例
     │   ├── auth.js             # 前端认证工具
+    │   ├── styles.css          # 全局样式
     │   ├── components/
-    │   │   └── NavBar.vue      # 基于角色的导航栏
+    │   │   ├── NavBar.vue      # 基于角色的导航栏
+    │   │   ├── QuestionRenderer.vue  # 题目渲染组件
+    │   │   └── Timer.vue       # 倒计时组件
     │   └── views/
-    │       ├── Login.vue       # 登录页
+    │       ├── Login.vue       # 登录页(支持背景图)
     │       ├── teacher/
     │       │   ├── QuestionBank.vue    # 题库管理
     │       │   ├── PaperBuilder.vue    # 试卷构建
@@ -104,10 +122,17 @@ exam-proj/
     │       │   ├── Submissions.vue     # 答卷列表
     │       │   ├── Grading.vue         # 阅卷详情
     │       │   └── Grades.vue          # 成绩总览
-    │       └── student/
-    │           ├── ExamList.vue        # 考试列表
-    │           ├── ExamView.vue        # 在线答题
-    │           └── Results.vue         # 成绩查询
+    │       ├── student/
+    │       │   ├── ExamList.vue        # 考试列表
+    │       │   ├── ExamView.vue        # 在线答题
+    │       │   ├── Results.vue         # 成绩查询
+    │       │   └── WrongAnswers.vue    # 错题回顾
+    │       ├── admin/
+    │       │   ├── AdminLayout.vue     # 管理后台布局(左侧栏)
+    │       │   ├── Users.vue           # 用户管理
+    │       │   └── Settings.vue        # 系统设置(图片上传+裁剪)
+    │       └── common/
+    │           └── Profile.vue         # 个人资料
     └── package.json
 ```
 
@@ -162,6 +187,26 @@ exam-proj/
 | POST | `/api/submissions/{id}/publish` | 发布成绩(教师) |
 | GET | `/api/results` | 已发布成绩列表(学生) |
 | GET | `/api/results/{session_id}` | 成绩详情(学生) |
+
+### 用户管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/users/profile` | 获取个人资料(所有用户) |
+| PUT | `/api/users/profile` | 更新个人资料(所有用户) |
+| GET | `/api/users/` | 用户列表(仅管理员) |
+| POST | `/api/users/` | 创建用户(仅管理员) |
+| PUT | `/api/users/{id}` | 编辑用户(仅管理员) |
+| DELETE | `/api/users/{id}` | 删除用户(仅管理员) |
+| GET | `/api/users/template` | 下载 CSV 模板(仅管理员) |
+| POST | `/api/users/import` | CSV 批量导入(仅管理员) |
+
+### 系统设置
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/settings/` | 获取系统设置 |
+| PUT | `/api/settings/` | 更新系统设置(仅管理员) |
+| POST | `/api/settings/upload-image` | 上传背景图片(仅管理员) |
+| GET | `/api/uploads/{filename}` | 获取上传的图片 |
 
 ## 评分逻辑
 
